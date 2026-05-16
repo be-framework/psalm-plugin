@@ -1,0 +1,66 @@
+{
+    "name": "be-framework/psalm-plugin",
+    "description": "Psalm plugin that detects Be Framework runtime errors at static-analysis time",
+    "license": "MIT",
+    "type": "psalm-plugin",
+    "keywords": ["psalm", "psalm-plugin", "static-analysis", "be-framework"],
+    "authors": [
+        {
+            "name": "Akihito Koriyama",
+            "email": "akihito.koriyama@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "vimeo/psalm": "^6.0@dev",
+        "nikic/php-parser": "^5.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^12.2",
+        "doctrine/coding-standard": "^14.0.x-dev",
+        "phpstan/phpstan": "^2.1",
+        "phpmd/phpmd": "^2.15"
+    },
+    "autoload": {
+        "psr-4": {
+            "Be\\PsalmPlugin\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Be\\PsalmPlugin\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "psalm": {
+            "pluginClass": "Be\\PsalmPlugin\\Plugin"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "cs": "phpcs",
+        "cs-fix": "phpcbf src tests",
+        "psalm": "psalm --show-info=false",
+        "phpstan": "phpstan analyse -c phpstan.neon",
+        "phpmd": "php -d error_reporting='E_ALL & ~E_DEPRECATED' vendor/bin/phpmd src text ./phpmd.xml",
+        "sa": ["@phpstan", "@psalm"],
+        "tests": ["@cs", "@sa", "@phpmd", "@test"]
+    },
+    "scripts-descriptions": {
+        "test": "Run unit tests",
+        "cs": "Check the coding style",
+        "cs-fix": "Fix the coding style",
+        "psalm": "Analyze code for type safety using Psalm",
+        "phpstan": "Analyze code for errors using PHPStan",
+        "phpmd": "Analyze PHP code for potential issues",
+        "sa": "Run static analysis",
+        "tests": "Run tests and quality checks"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        },
+        "bin-compat": "auto",
+        "sort-packages": true
+    }
+}
