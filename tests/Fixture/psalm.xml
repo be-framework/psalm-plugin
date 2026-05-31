@@ -14,7 +14,14 @@
     </projectFiles>
 
     <plugins>
-        <pluginClass class="Be\PsalmPlugin\Plugin" />
+        <pluginClass class="Be\PsalmPlugin\Plugin">
+            <inputTaintSources>
+                <class name="Be\PsalmPlugin\Tests\Fixture\Invalid\TaintedAssignedInput" />
+                <class name="Be\PsalmPlugin\Tests\Fixture\Invalid\TaintedPromotedInput" />
+                <class name="Be\PsalmPlugin\Tests\Fixture\Invalid\TaintedPromotedInputObject" />
+                <class name="Be\PsalmPlugin\Tests\Fixture\Valid\RawProfileInput" />
+            </inputTaintSources>
+        </pluginClass>
     </plugins>
 
     <issueHandlers>
