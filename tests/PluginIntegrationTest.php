@@ -8,10 +8,12 @@ use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 
 use function array_filter;
+use function array_map;
 use function array_values;
 use function dirname;
 use function escapeshellarg;
 use function file_exists;
+use function implode;
 use function in_array;
 use function is_array;
 use function json_decode;
@@ -138,6 +140,15 @@ final class PluginIntegrationTest extends TestCase
         );
     }
 
+    #[TestDox('TaintedHtml is reported when an inherited promoted #[Input] property is echoed')]
+    public function testInheritedPromotedInputPropertyIsTainted(): void
+    {
+        $this->assertTaintIssue(
+            'TaintedHtml',
+            'TaintedInheritedPromotedInput.php',
+        );
+    }
+
     #[TestDox('#[Inject] properties are not treated as taint sources')]
     public function testInjectedPropertyIsNotTainted(): void
     {
@@ -221,13 +232,17 @@ final class PluginIntegrationTest extends TestCase
             return self::$cachedTaintIssues;
         }
 
-        self::$cachedTaintIssues = self::runPsalm('--taint-analysis');
+        self::$cachedTaintIssues = self::runPsalm(['--taint-analysis']);
 
         return self::$cachedTaintIssues;
     }
 
-    /** @return list<array<string, mixed>> */
-    private static function runPsalm(string $extraArgs = ''): array
+    /**
+     * @param list<string> $extraArgs
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function runPsalm(array $extraArgs = []): array
     {
         $root = dirname(__DIR__);
         $psalmBin = $root . '/vendor/bin/psalm';
@@ -241,12 +256,14 @@ final class PluginIntegrationTest extends TestCase
             self::markTestSkippedWithReason('fixture psalm.xml missing: ' . $config);
         }
 
-        $cmd = sprintf(
-            '%s --config=%s %s --output-format=json --no-cache --no-progress 2>/dev/null',
+        $cmd = implode(' ', [
             escapeshellarg($psalmBin),
-            escapeshellarg($config),
-            $extraArgs,
-        );
+            '--config=' . escapeshellarg($config),
+            ...array_map(static fn (string $arg): string => escapeshellarg($arg), $extraArgs),
+            '--output-format=json',
+            '--no-cache',
+            '--no-progress',
+        ]) . ' 2>/dev/null';
 
         $stdout = shell_exec($cmd);
         $stdout = $stdout === null || $stdout === false ? '[]' : $stdout;

@@ -18,8 +18,10 @@ use Psalm\Type\TaintKindGroup;
 
 use function array_unique;
 use function array_values;
+use function explode;
 use function is_string;
 use function ltrim;
+use function str_contains;
 use function strtolower;
 
 /**
@@ -194,9 +196,19 @@ final class InputTaintHandler implements AddTaintsInterface
             return null;
         }
 
-        $declaringClass = $classStorage->declaring_property_ids[$propertyName] ?? $className;
+        $declaringPropertyId = $classStorage->declaring_property_ids[$propertyName] ?? $className;
+        $declaringClass = self::declaringClassName($declaringPropertyId);
 
         return $codebase->classlikes->getStorageFor($declaringClass);
+    }
+
+    private static function declaringClassName(string $declaringPropertyId): string
+    {
+        if (! str_contains($declaringPropertyId, '::$')) {
+            return ltrim($declaringPropertyId, '\\');
+        }
+
+        return ltrim(explode('::$', $declaringPropertyId, 2)[0], '\\');
     }
 
     /** @param list<AttributeStorage> $attributes */

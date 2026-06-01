@@ -4,7 +4,7 @@
 
 Psalm plugin that detects [Be Framework](https://github.com/be-framework/Be.Framework) runtime errors at static-analysis time.
 It also teaches Psalm taint analysis that constructor parameters annotated with
-`Ray\InputQuery\Attribute\Input` are user-controlled input.
+`Ray\InputQuery\Attribute\Input` are user-controlled input on configured root input classes.
 
 ## What it detects
 
