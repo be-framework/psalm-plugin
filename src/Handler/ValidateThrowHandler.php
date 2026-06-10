@@ -144,6 +144,7 @@ final class ValidateThrowHandler implements AfterFunctionLikeAnalysisInterface
         return $names;
     }
 
+    /** @psalm-external-mutation-free */
     private static function extendsDomainException(string $fqcn, Codebase $codebase): bool
     {
         if ($fqcn === self::DOMAIN_EXCEPTION) {

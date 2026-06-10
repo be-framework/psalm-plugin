@@ -23,6 +23,7 @@ final class ThrowCollectorVisitor extends NodeVisitorAbstract
     /** @var list<Node\Expr\Throw_> */
     public array $throws = [];
 
+    /** @psalm-external-mutation-free */
     #[Override]
     public function enterNode(Node $node): int|null
     {
