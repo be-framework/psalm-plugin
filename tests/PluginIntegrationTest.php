@@ -8,10 +8,12 @@ use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 
 use function array_filter;
+use function array_map;
 use function array_values;
 use function dirname;
 use function escapeshellarg;
 use function file_exists;
+use function implode;
 use function in_array;
 use function is_array;
 use function json_decode;
@@ -32,6 +34,9 @@ final class PluginIntegrationTest extends TestCase
 {
     /** @var list<array<string, mixed>>|null */
     private static array|null $cachedIssues = null;
+
+    /** @var list<array<string, mixed>>|null */
+    private static array|null $cachedTaintIssues = null;
 
     #[TestDox('MissingBeingParameterAttribute is reported when no #[Input]/#[Inject] is present')]
     public function testMissingInputAndInjectIsReported(): void
@@ -108,6 +113,60 @@ final class PluginIntegrationTest extends TestCase
         $this->assertSame([], $invalid, 'Valid fixtures should not produce plugin issues');
     }
 
+    #[TestDox('TaintedHtml is reported when a promoted #[Input] property is echoed')]
+    public function testPromotedInputPropertyIsTainted(): void
+    {
+        $this->assertTaintIssue(
+            'TaintedHtml',
+            'TaintedPromotedInput.php',
+        );
+    }
+
+    #[TestDox('TaintedHtml is reported when a promoted #[Input] property is echoed from an object')]
+    public function testPromotedInputObjectPropertyIsTainted(): void
+    {
+        $this->assertTaintIssue(
+            'TaintedHtml',
+            'TaintedPromotedInputObject.php',
+        );
+    }
+
+    #[TestDox('TaintedHtml is reported when an assigned #[Input] property is echoed')]
+    public function testAssignedInputPropertyIsTainted(): void
+    {
+        $this->assertTaintIssue(
+            'TaintedHtml',
+            'TaintedAssignedInput.php',
+        );
+    }
+
+    #[TestDox('TaintedHtml is reported when an inherited promoted #[Input] property is echoed')]
+    public function testInheritedPromotedInputPropertyIsTainted(): void
+    {
+        $this->assertTaintIssue(
+            'TaintedHtml',
+            'TaintedInheritedPromotedInput.php',
+        );
+    }
+
+    #[TestDox('#[Inject] properties are not treated as taint sources')]
+    public function testInjectedPropertyIsNotTainted(): void
+    {
+        $this->assertNoTaintIssue(
+            'TaintedHtml',
+            'InjectedNotTainted.php',
+        );
+    }
+
+    #[TestDox('Sanitized values are not re-tainted by downstream #[Input] constructors')]
+    public function testSanitizedReinputIsNotTaintedAgain(): void
+    {
+        $this->assertNoTaintIssue(
+            'TaintedHtml',
+            'SanitizedReinput.php',
+        );
+    }
+
     private function assertIssue(string $type, string $fileSuffix): void
     {
         foreach (self::issues() as $issue) {
@@ -124,6 +183,36 @@ final class PluginIntegrationTest extends TestCase
         $this->fail(sprintf('Expected %s on %s but did not find it in psalm output', $type, $fileSuffix));
     }
 
+    private function assertTaintIssue(string $type, string $fileSuffix): void
+    {
+        foreach (self::taintIssues() as $issue) {
+            if (
+                ($issue['type'] ?? null) === $type
+                && str_ends_with((string) ($issue['file_name'] ?? ''), $fileSuffix)
+            ) {
+                $this->addToAssertionCount(1);
+
+                return;
+            }
+        }
+
+        $this->fail(sprintf('Expected %s on %s but did not find it in psalm taint output', $type, $fileSuffix));
+    }
+
+    private function assertNoTaintIssue(string $type, string $fileSuffix): void
+    {
+        foreach (self::taintIssues() as $issue) {
+            if (
+                ($issue['type'] ?? null) === $type
+                && str_ends_with((string) ($issue['file_name'] ?? ''), $fileSuffix)
+            ) {
+                $this->fail(sprintf('Did not expect %s on %s in psalm taint output', $type, $fileSuffix));
+            }
+        }
+
+        $this->addToAssertionCount(1);
+    }
+
     /** @return list<array<string, mixed>> */
     private static function issues(): array
     {
@@ -131,6 +220,30 @@ final class PluginIntegrationTest extends TestCase
             return self::$cachedIssues;
         }
 
+        self::$cachedIssues = self::runPsalm();
+
+        return self::$cachedIssues;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private static function taintIssues(): array
+    {
+        if (self::$cachedTaintIssues !== null) {
+            return self::$cachedTaintIssues;
+        }
+
+        self::$cachedTaintIssues = self::runPsalm(['--taint-analysis']);
+
+        return self::$cachedTaintIssues;
+    }
+
+    /**
+     * @param list<string> $extraArgs
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function runPsalm(array $extraArgs = []): array
+    {
         $root = dirname(__DIR__);
         $psalmBin = $root . '/vendor/bin/psalm';
         $config = __DIR__ . '/Fixture/psalm.xml';
@@ -143,11 +256,14 @@ final class PluginIntegrationTest extends TestCase
             self::markTestSkippedWithReason('fixture psalm.xml missing: ' . $config);
         }
 
-        $cmd = sprintf(
-            '%s --config=%s --output-format=json --no-cache --no-progress 2>/dev/null',
+        $cmd = implode(' ', [
             escapeshellarg($psalmBin),
-            escapeshellarg($config),
-        );
+            '--config=' . escapeshellarg($config),
+            ...array_map(static fn (string $arg): string => escapeshellarg($arg), $extraArgs),
+            '--output-format=json',
+            '--no-cache',
+            '--no-progress',
+        ]) . ' 2>/dev/null';
 
         $stdout = shell_exec($cmd);
         $stdout = $stdout === null || $stdout === false ? '[]' : $stdout;
@@ -158,8 +274,6 @@ final class PluginIntegrationTest extends TestCase
         }
 
         /** @var list<array<string, mixed>> $decoded */
-        self::$cachedIssues = $decoded;
-
         return $decoded;
     }
 

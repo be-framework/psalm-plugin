@@ -3,6 +3,8 @@
 [![Test](https://github.com/be-framework/psalm-plugin/actions/workflows/test.yml/badge.svg)](https://github.com/be-framework/psalm-plugin/actions/workflows/test.yml)
 
 Psalm plugin that detects [Be Framework](https://github.com/be-framework/Be.Framework) runtime errors at static-analysis time.
+It also teaches Psalm taint analysis that constructor parameters annotated with
+`Ray\InputQuery\Attribute\Input` are user-controlled input on configured root input classes.
 
 ## What it detects
 
@@ -47,6 +49,52 @@ public function validate(string $value): void
 ```
 
 Variable throws and ternary/match unions are resolved via Psalm's `NodeTypeProvider`. When the type cannot be resolved, the plugin stays silent (false-positive avoidance).
+
+### `#[Input]` taint sources
+
+When Psalm is run with `--taint-analysis`, only constructor parameters annotated with
+`Ray\InputQuery\Attribute\Input` on configured root input classes are treated as
+user-controlled input. `#[Inject]` parameters and unrelated variables are not
+tainted. Downstream input classes are not re-tainted after sanitization unless
+they are explicitly configured as sources.
+
+Configure the first input classes in `psalm.xml`:
+
+```xml
+<plugins>
+    <pluginClass class="Be\PsalmPlugin\Plugin">
+        <inputTaintSources>
+            <class name="App\Input\ProfileInput" />
+        </inputTaintSources>
+    </pluginClass>
+</plugins>
+```
+
+```php
+final readonly class ProfileInput
+{
+    public function __construct(
+        #[Input] public string $name,
+    ) {}
+
+    public function render(): void
+    {
+        echo $this->name; // reported by Psalm as TaintedHtml
+    }
+}
+```
+
+Taint analysis is enabled separately from normal Psalm analysis:
+
+```bash
+vendor/bin/psalm --taint-analysis
+```
+
+There is a runnable demo in [`demo/`](demo/):
+
+```bash
+vendor/bin/psalm --config=demo/psalm.xml --taint-analysis --no-cache --no-progress
+```
 
 ## Installation
 
