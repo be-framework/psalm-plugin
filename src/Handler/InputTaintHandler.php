@@ -14,7 +14,7 @@ use Psalm\Plugin\EventHandler\Event\AddRemoveTaintsEvent;
 use Psalm\Storage\AttributeStorage;
 use Psalm\Storage\ClassLikeStorage;
 use Psalm\Type\Atomic\TNamedObject;
-use Psalm\Type\TaintKindGroup;
+use Psalm\Type\TaintKind;
 
 use function array_unique;
 use function array_values;
@@ -52,22 +52,22 @@ final class InputTaintHandler implements AddTaintsInterface
     /**
      * Called to see what taints should be added
      *
-     * @return list<string>
+     * @return int TaintKind bitmask
      */
     #[Override]
-    public static function addTaints(AddRemoveTaintsEvent $event): array
+    public static function addTaints(AddRemoveTaintsEvent $event): int
     {
         $expr = $event->getExpr();
 
         if ($expr instanceof Node\Expr\Variable && self::isInputConstructorVariable($expr, $event)) {
-            return TaintKindGroup::ALL_INPUT;
+            return TaintKind::ALL_INPUT;
         }
 
         if ($expr instanceof Node\Expr\PropertyFetch && self::isInputPromotedPropertyFetch($expr, $event)) {
-            return TaintKindGroup::ALL_INPUT;
+            return TaintKind::ALL_INPUT;
         }
 
-        return [];
+        return 0;
     }
 
     private static function isInputConstructorVariable(Node\Expr\Variable $expr, AddRemoveTaintsEvent $event): bool
@@ -163,7 +163,10 @@ final class InputTaintHandler implements AddTaintsInterface
         return isset(self::$sourceClasses[strtolower(ltrim($className, '\\'))]);
     }
 
-    /** @psalm-suppress InternalMethod */
+    /**
+     * @psalm-suppress InternalMethod
+     * @psalm-capabilities read-props
+     */
     private static function constructorParameterHasInput(Codebase $codebase, string $className, string $paramName): bool
     {
         $classStorage = $codebase->classlikes->getStorageFor($className);
@@ -185,7 +188,10 @@ final class InputTaintHandler implements AddTaintsInterface
         return false;
     }
 
-    /** @psalm-suppress InternalMethod */
+    /**
+     * @psalm-suppress InternalMethod
+     * @psalm-capabilities read-props
+     */
     private static function declaringPropertyClassStorage(
         Codebase $codebase,
         string $className,
@@ -202,6 +208,7 @@ final class InputTaintHandler implements AddTaintsInterface
         return $codebase->classlikes->getStorageFor($declaringClass);
     }
 
+    /** @psalm-pure */
     private static function declaringClassName(string $declaringPropertyId): string
     {
         if (! str_contains($declaringPropertyId, '::$')) {
@@ -211,7 +218,11 @@ final class InputTaintHandler implements AddTaintsInterface
         return ltrim(explode('::$', $declaringPropertyId, 2)[0], '\\');
     }
 
-    /** @param list<AttributeStorage> $attributes */
+    /**
+     * @param list<AttributeStorage> $attributes
+     *
+     * @psalm-pure
+     */
     private static function hasInputAttribute(array $attributes): bool
     {
         foreach ($attributes as $attribute) {
